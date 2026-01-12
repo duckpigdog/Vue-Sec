@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shadow DOM Range</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #000000;
+      --font-display: "Playfair Display", Georgia, serif;
+      --font-body: "Source Serif 4", Georgia, serif;
+      --font-mono: "JetBrains Mono", monospace;
+    }
+    
+    * { box-sizing: border-box; }
+    
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      margin: 0;
+      padding: 40px 24px;
+      line-height: 1.6;
+      min-height: 100vh;
+      /* Global Noise Texture */
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 3.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      margin: 0 0 48px 0;
+      line-height: 1.1;
+      border-bottom: 4px solid var(--fg);
+      padding-bottom: 24px;
+      text-transform: uppercase;
+    }
+
+    /* Section Styles */
+    .section {
+      border: 1px solid var(--fg);
+      padding: 32px;
+      margin-bottom: 32px;
+      position: relative;
+      background: var(--bg);
+    }
+    
+    .layer-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border-bottom: 1px solid var(--fg);
+      display: inline-block;
+      margin-bottom: 24px;
+      padding-bottom: 4px;
+    }
+
+    .title {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+
+    /* Form Elements */
+    label {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 0;
+      border: none;
+      border-bottom: 2px solid var(--fg);
+      background: transparent;
+      font-family: var(--font-body);
+      font-size: 1.125rem;
+      color: var(--fg);
+      border-radius: 0;
+      outline: none;
+      transition: border-width 0.1s ease;
+    }
+
+    input:focus {
+      border-bottom-width: 4px;
+    }
+    
+    input::placeholder {
+      color: #525252;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Shadow DOM Range</h1>
+    
+    <div class="section">
+      <div class="layer-label">Layer 01 &mdash; Light DOM</div>
+      <div class="title">Surface Level Input</div>
+      <form>
+        <label for="username">Username (Input A)</label>
+        <input id="username" name="username" type="text" placeholder="Enter username..." data-input-id="A">
+      </form>
+    </div>
+
+    <div class="section">
+      <div class="layer-label">Layer 02 &mdash; Shadow DOM (Open)</div>
+      <address-picker></address-picker>
+    </div>
+  </div>
+
+  <script>
+    // Shared CSS for Shadow DOMs
+    const sharedStyles = `
+      :host {
+        display: block;
+        font-family: "Source Serif 4", Georgia, serif;
+        color: #000;
+      }
+      * { box-sizing: border-box; }
+      .wrapper {
+        border: 1px solid #000;
+        padding: 24px;
+        position: relative;
+        background-color: #fff;
+        background-image: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 10px,
+          rgba(0,0,0,0.03) 10px,
+          rgba(0,0,0,0.03) 11px
+        );
+      }
+      .title {
+        font-family: "Playfair Display", serif;
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 16px;
+      }
+      .label-tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 16px;
+        display: block;
+        border-bottom: 1px solid #000;
+        padding-bottom: 4px;
+        width: max-content;
+      }
+      label {
+        display: block;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.875rem;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      input {
+        width: 100%;
+        padding: 12px 0;
+        border: none;
+        border-bottom: 2px solid #000;
+        background: transparent;
+        font-family: "Source Serif 4", serif;
+        font-size: 1.125rem;
+        color: #000;
+        border-radius: 0;
+        outline: none;
+        transition: border-width 0.1s ease;
+        margin-bottom: 24px;
+      }
+      input:focus {
+        border-bottom-width: 4px;
+      }
+      input::placeholder {
+        color: #525252;
+        font-style: italic;
+      }
+    `;
+
+    class AddressPicker extends HTMLElement {
+      constructor() {
+        super();
+        const root = this.attachShadow({ mode: 'open' });
+        
+        const style = document.createElement('style');
+        style.textContent = sharedStyles;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'wrapper';
+        
+        const tag = document.createElement('div');
+        tag.className = 'label-tag';
+        tag.textContent = 'Shadow Root (Depth: 1)';
+
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = 'Address Component';
+
+        const label = document.createElement('label');
+        label.textContent = 'Address (Input B)';
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Enter full address...';
+        input.name = 'address';
+        input.setAttribute('data-input-id', 'B');
+        
+        const nested = document.createElement('secure-field');
+        
+        wrap.append(tag, title, label, input, nested);
+        root.append(style, wrap);
+      }
+    }
+    customElements.define('address-picker', AddressPicker);
+
+    class SecureField extends HTMLElement {
+      constructor() {
+        super();
+        const root = this.attachShadow({ mode: 'open' });
+        
+        const style = document.createElement('style');
+        // Inverted style for deepest nesting
+        style.textContent = sharedStyles + `
+          .wrapper {
+            border: 4px solid #000;
+            background-image: none;
+            background-color: #000;
+            color: #fff;
+          }
+          .wrapper input {
+            color: #fff;
+            border-bottom-color: #fff;
+          }
+          .wrapper input:focus {
+            border-bottom-color: #fff;
+          }
+          .wrapper input::placeholder {
+            color: #aaa;
+          }
+          .wrapper .label-tag, .wrapper .title {
+            border-bottom-color: #fff;
+          }
+        `;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'wrapper';
+        
+        const tag = document.createElement('div');
+        tag.className = 'label-tag';
+        tag.textContent = 'Nested Shadow Root (Depth: 2)';
+
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = 'Secure Payment';
+
+        const label = document.createElement('label');
+        label.textContent = 'Payment Password (Input C)';
+        
+        const input = document.createElement('input');
+        input.type = 'password';
+        input.placeholder = 'Enter password...';
+        input.name = 'paypass';
+        input.setAttribute('data-input-id', 'C');
+        
+        wrap.append(tag, title, label, input);
+        root.append(style, wrap);
+      }
+    }
+    customElements.define('secure-field', SecureField);
+  </script>
+</body>
+</html>
