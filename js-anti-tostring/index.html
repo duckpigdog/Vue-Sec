@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JS 逆向关卡 · Function.toString 环境检测</title>
+    <style>
+      :root {
+        --background: #ffffff;
+        --foreground: #000000;
+        --muted: #f5f5f5;
+        --muted-foreground: #525252;
+        --border: #000000;
+        --border-light: #e5e5e5;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--background);
+        color: var(--foreground);
+        font-family: Georgia, "Source Serif 4", serif;
+      }
+      .texture {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image: repeating-linear-gradient(0deg, transparent, transparent 1px, #000 1px, #000 2px);
+        background-size: 100% 4px;
+        opacity: 0.015;
+      }
+      .container {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 64px 24px;
+      }
+      .rule {
+        height: 8px;
+        background: var(--foreground);
+        margin-bottom: 32px;
+      }
+      .hero {
+        font-family: Georgia, "Playfair Display", serif;
+        font-weight: 700;
+        letter-spacing: -0.05em;
+        font-size: 56px;
+        line-height: 1;
+        margin: 24px 0 40px 0;
+      }
+      .card {
+        background: var(--background);
+        border: 1px solid var(--border);
+        padding: 32px;
+      }
+      .label {
+        font-size: 14px;
+        color: var(--muted-foreground);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 8px;
+      }
+      .input {
+        width: 100%;
+        padding: 12px 0;
+        border: none;
+        border-bottom: 2px solid var(--border);
+        background: transparent;
+        color: var(--foreground);
+        font-size: 18px;
+        outline: none;
+      }
+      .input::placeholder {
+        color: var(--muted-foreground);
+        font-style: italic;
+      }
+      .input:focus {
+        border-bottom: 4px solid var(--border);
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+      }
+      .btn {
+        appearance: none;
+        border: none;
+        background: var(--foreground);
+        color: var(--background);
+        padding: 16px 24px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn-outline {
+        background: transparent;
+        color: var(--foreground);
+        border: 2px solid var(--foreground);
+      }
+      .hint {
+        margin-top: 24px;
+        font-size: 14px;
+        color: var(--muted-foreground);
+      }
+      .blocked-screen {
+        position: fixed;
+        inset: 0;
+        background: #000000;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 32px;
+        font-family: Georgia, "Playfair Display", serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="texture"></div>
+    <div class="container">
+      <div class="rule"></div>
+      <div class="hero">Function.toString Guard</div>
+      <div class="card">
+        <div class="label">Username</div>
+        <input class="input" id="u" placeholder="Enter username" />
+        <div class="label" style="margin-top:16px;">Password</div>
+        <input class="input" id="p" placeholder="Enter password" type="password" />
+        <div class="actions">
+          <button class="btn" id="login">Login</button>
+          <button class="btn btn-outline" id="reset">Reset</button>
+        </div>
+        <div class="hint">
+          Minimalist Monochrome · Zero radius · Black & White only<br />
+          Environment is probed via Function.prototype.toString.
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var disabled = localStorage.getItem("__LAB_DISABLE_TOSTRING_GUARD");
+        var originalToString = Function.prototype.toString;
+
+        function sentinel() {
+          return 42;
+        }
+
+        var prettySource = "function sentinel() {\n  return 42;\n}";
+        var compactSource = "function sentinel(){return 42;}";
+
+        var devToolsLikelyOpen = false;
+
+        Function.prototype.toString = function () {
+          try {
+            if (this === sentinel) {
+              return devToolsLikelyOpen ? compactSource : prettySource;
+            }
+            return originalToString.call(this);
+          } catch (e) {
+            return originalToString.call(this);
+          }
+        };
+
+        function detectDevTools() {
+          try {
+            var threshold = 160;
+            var dw = window.outerWidth - window.innerWidth;
+            var dh = window.outerHeight - window.innerHeight;
+            devToolsLikelyOpen = dw > threshold || dh > threshold;
+          } catch (e) {
+            devToolsLikelyOpen = false;
+          }
+        }
+
+        detectDevTools();
+        setInterval(detectDevTools, 500);
+
+        function isEnvironmentTampered() {
+          try {
+            var current = Function.prototype.toString.call(sentinel);
+            return current === compactSource;
+          } catch (e) {
+            return false;
+          }
+        }
+
+        var guardTimer = null;
+        function startGuard() {
+          if (guardTimer !== null) return;
+          guardTimer = setInterval(function () {
+            if (isEnvironmentTampered()) {
+              document.body.innerHTML = "";
+              var s = document.createElement("div");
+              s.className = "blocked-screen";
+              s.textContent = "FUNCTION.TOSTRING ENVIRONMENT DETECTED";
+              document.body.appendChild(s);
+              clearInterval(guardTimer);
+              guardTimer = null;
+            }
+          }, 400);
+        }
+
+        function stopGuard() {
+          if (guardTimer !== null) {
+            clearInterval(guardTimer);
+            guardTimer = null;
+          }
+        }
+
+        if (!disabled) {
+          startGuard();
+        }
+
+        var login = document.getElementById("login");
+        var reset = document.getElementById("reset");
+        login.addEventListener("click", function () {
+          var u = document.getElementById("u").value;
+          var p = document.getElementById("p").value;
+          alert("Submitted: " + u + " / " + (p ? "***" : ""));
+        });
+        reset.addEventListener("click", function () {
+          document.getElementById("u").value = "";
+          document.getElementById("p").value = "";
+        });
+
+        window.__labHelp = {
+          stopGuard: function () {
+            stopGuard();
+          },
+          disableGuardFlag: function () {
+            localStorage.setItem("__LAB_DISABLE_TOSTRING_GUARD", "1");
+            location.reload();
+          },
+          patchToStringSafe: function () {
+            Function.prototype.toString = function () {
+              try {
+                if (this === sentinel) {
+                  return prettySource;
+                }
+                return originalToString.call(this);
+              } catch (e) {
+                return originalToString.call(this);
+              }
+            };
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>
+

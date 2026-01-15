@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JS 逆向关卡 · 执行时间与调用栈检测</title>
+    <style>
+      :root {
+        --background: #ffffff;
+        --foreground: #000000;
+        --muted: #f5f5f5;
+        --muted-foreground: #525252;
+        --border: #000000;
+        --border-light: #e5e5e5;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--background);
+        color: var(--foreground);
+        font-family: Georgia, "Source Serif 4", serif;
+      }
+      .texture {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image: repeating-linear-gradient(0deg, transparent, transparent 1px, #000 1px, #000 2px);
+        background-size: 100% 4px;
+        opacity: 0.015;
+      }
+      .container {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 64px 24px;
+      }
+      .rule {
+        height: 8px;
+        background: var(--foreground);
+        margin-bottom: 32px;
+      }
+      .hero {
+        font-family: Georgia, "Playfair Display", serif;
+        font-weight: 700;
+        letter-spacing: -0.05em;
+        font-size: 56px;
+        line-height: 1;
+        margin: 24px 0 40px 0;
+      }
+      .card {
+        background: var(--background);
+        border: 1px solid var(--border);
+        padding: 32px;
+      }
+      .label {
+        font-size: 14px;
+        color: var(--muted-foreground);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 8px;
+      }
+      .input {
+        width: 100%;
+        padding: 12px 0;
+        border: none;
+        border-bottom: 2px solid var(--border);
+        background: transparent;
+        color: var(--foreground);
+        font-size: 18px;
+        outline: none;
+      }
+      .input::placeholder {
+        color: var(--muted-foreground);
+        font-style: italic;
+      }
+      .input:focus {
+        border-bottom: 4px solid var(--border);
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+      }
+      .btn {
+        appearance: none;
+        border: none;
+        background: var(--foreground);
+        color: var(--background);
+        padding: 16px 24px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn-outline {
+        background: transparent;
+        color: var(--foreground);
+        border: 2px solid var(--foreground);
+      }
+      .hint {
+        margin-top: 24px;
+        font-size: 14px;
+        color: var(--muted-foreground);
+      }
+      .blocked-screen {
+        position: fixed;
+        inset: 0;
+        background: #000000;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 32px;
+        font-family: Georgia, "Playfair Display", serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="texture"></div>
+    <div class="container">
+      <div class="rule"></div>
+      <div class="hero">Timing & Stack Guard</div>
+      <div class="card">
+        <div class="label">Username</div>
+        <input class="input" id="u" placeholder="Enter username" />
+        <div class="label" style="margin-top:16px;">Password</div>
+        <input class="input" id="p" placeholder="Enter password" type="password" />
+        <div class="actions">
+          <button class="btn" id="login">Login</button>
+          <button class="btn btn-outline" id="reset">Reset</button>
+        </div>
+        <div class="hint">
+          Minimalist Monochrome · Zero radius · Black & White only<br />
+          Execution time and Error().stack depth are being inspected.
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var disabled = localStorage.getItem("__LAB_DISABLE_TIMING_STACK_GUARD");
+        var timerId = null;
+        var baselineStackDepth = 0;
+
+        function getStackDepth() {
+          try {
+            var s = new Error().stack;
+            if (!s) return 0;
+            return s.split("\n").length;
+          } catch (e) {
+            return 0;
+          }
+        }
+
+        function busyWork(iterations) {
+          var x = 0;
+          for (var i = 0; i < iterations; i++) {
+            x = (x + i) ^ (x << 1);
+          }
+          return x;
+        }
+
+        function initBaseline() {
+          baselineStackDepth = getStackDepth();
+        }
+
+        function isStepDebugging() {
+          var start = performance.now();
+          var depthBefore = getStackDepth();
+          busyWork(5000);
+          var end = performance.now();
+          var depthAfter = getStackDepth();
+          var elapsed = end - start;
+          if (elapsed > 20) return true;
+          if (depthAfter - baselineStackDepth > 8) return true;
+          if (depthBefore - baselineStackDepth > 8) return true;
+          return false;
+        }
+
+        function triggerBlocked() {
+          document.body.innerHTML = "";
+          var s = document.createElement("div");
+          s.className = "blocked-screen";
+          s.textContent = "TIMING / STACK ANTI DEBUG TRIGGERED";
+          document.body.appendChild(s);
+          if (timerId !== null) {
+            clearInterval(timerId);
+            timerId = null;
+          }
+        }
+
+        function startGuard() {
+          initBaseline();
+          if (timerId !== null) return;
+          timerId = setInterval(function () {
+            if (isStepDebugging()) {
+              triggerBlocked();
+            }
+          }, 500);
+        }
+
+        function stopGuard() {
+          if (timerId !== null) {
+            clearInterval(timerId);
+            timerId = null;
+          }
+        }
+
+        if (!disabled) {
+          startGuard();
+        }
+
+        var login = document.getElementById("login");
+        var reset = document.getElementById("reset");
+        login.addEventListener("click", function () {
+          if (!disabled && isStepDebugging()) {
+            triggerBlocked();
+            return;
+          }
+          var u = document.getElementById("u").value;
+          var p = document.getElementById("p").value;
+          alert("Submitted: " + u + " / " + (p ? "***" : ""));
+        });
+        reset.addEventListener("click", function () {
+          document.getElementById("u").value = "";
+          document.getElementById("p").value = "";
+        });
+
+        window.__labHelp = {
+          stopGuard: function () {
+            stopGuard();
+          },
+          disableGuardFlag: function () {
+            localStorage.setItem("__LAB_DISABLE_TIMING_STACK_GUARD", "1");
+            location.reload();
+          },
+          patchTimingSafe: function () {
+            var maxElapsed = 10;
+            var maxDepthDelta = 4;
+            var origNow = performance.now.bind(performance);
+            var depthOffset = baselineStackDepth;
+
+            performance.now = function () {
+              return origNow();
+            };
+
+            window.__getStackDepthSafe = function () {
+              try {
+                var s = new Error().stack;
+                if (!s) return depthOffset;
+                var d = s.split("\n").length;
+                if (d - depthOffset > maxDepthDelta) {
+                  return depthOffset + maxDepthDelta;
+                }
+                return d;
+              } catch (e) {
+                return depthOffset;
+              }
+            };
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>
+

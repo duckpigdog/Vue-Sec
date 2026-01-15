@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JS 逆向关卡 · 进阶 Debugger 炸弹</title>
+    <style>
+      :root {
+        --background: #ffffff;
+        --foreground: #000000;
+        --muted: #f5f5f5;
+        --muted-foreground: #525252;
+        --border: #000000;
+        --border-light: #e5e5e5;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--background);
+        color: var(--foreground);
+        font-family: Georgia, "Source Serif 4", serif;
+      }
+      .texture {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image: repeating-linear-gradient(0deg, transparent, transparent 1px, #000 1px, #000 2px);
+        background-size: 100% 4px;
+        opacity: 0.015;
+      }
+      .container {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 64px 24px;
+      }
+      .rule {
+        height: 8px;
+        background: var(--foreground);
+        margin-bottom: 32px;
+      }
+      .hero {
+        font-family: Georgia, "Playfair Display", serif;
+        font-weight: 700;
+        letter-spacing: -0.05em;
+        font-size: 56px;
+        line-height: 1;
+        margin: 24px 0 40px 0;
+      }
+      .card {
+        background: var(--background);
+        border: 1px solid var(--border);
+        padding: 32px;
+      }
+      .label {
+        font-size: 14px;
+        color: var(--muted-foreground);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 8px;
+      }
+      .input {
+        width: 100%;
+        padding: 12px 0;
+        border: none;
+        border-bottom: 2px solid var(--border);
+        background: transparent;
+        color: var(--foreground);
+        font-size: 18px;
+        outline: none;
+      }
+      .input::placeholder {
+        color: var(--muted-foreground);
+        font-style: italic;
+      }
+      .input:focus {
+        border-bottom: 4px solid var(--border);
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+      }
+      .btn {
+        appearance: none;
+        border: none;
+        background: var(--foreground);
+        color: var(--background);
+        padding: 16px 24px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn-outline {
+        background: transparent;
+        color: var(--foreground);
+        border: 2px solid var(--foreground);
+      }
+      .hint {
+        margin-top: 24px;
+        font-size: 14px;
+        color: var(--muted-foreground);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="texture"></div>
+    <div class="container">
+      <div class="rule"></div>
+      <div class="hero">Nested Debugger Bomb</div>
+      <div class="card">
+        <div class="label">Username</div>
+        <input class="input" id="u" placeholder="Enter username" />
+        <div class="label" style="margin-top:16px;">Password</div>
+        <input class="input" id="p" placeholder="Enter password" type="password" />
+        <div class="actions">
+          <button class="btn" id="login">Login</button>
+          <button class="btn btn-outline" id="reset">Reset</button>
+        </div>
+        <div class="hint">
+          Minimalist Monochrome · Zero radius · Black & White only<br />
+          Debugger payload is built via closures and eval.
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var disabled = localStorage.getItem("__LAB_DISABLE_ADV_DEBUG");
+        function makeBomb() {
+          var a = "de";
+          var b = "bug";
+          var c = "ger";
+          function join(x, y) {
+            return x + y;
+          }
+          var t = join(join(a, b), c);
+          function wrap(code) {
+            return function () {
+              return function () {
+                return code;
+              };
+            };
+          }
+          var getter = wrap(t);
+          function build() {
+            var code = getter()();
+            return function () {
+              eval(code);
+            };
+          }
+          var execEval = build();
+          return function trigger() {
+            try {
+              execEval();
+            } catch (e) {}
+            try {
+              Function(getter()())();
+            } catch (e) {}
+          };
+        }
+        var intervalId = null;
+        var rafId = null;
+        var trigger = makeBomb();
+        function start() {
+          if (intervalId === null) intervalId = setInterval(trigger, 40);
+          function loop() {
+            try {
+              trigger();
+            } catch (e) {}
+            rafId = requestAnimationFrame(loop);
+          }
+          loop();
+        }
+        function stop() {
+          if (intervalId !== null) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+          if (rafId !== null && typeof cancelAnimationFrame === "function") {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+        }
+        if (!disabled) {
+          start();
+        }
+        var u = document.getElementById("u");
+        var p = document.getElementById("p");
+        var login = document.getElementById("login");
+        var reset = document.getElementById("reset");
+        login.addEventListener("click", function () {
+          var user = u.value;
+          var pass = p.value;
+          alert("Submitted: " + user + " / " + (pass ? "***" : ""));
+        });
+        reset.addEventListener("click", function () {
+          u.value = "";
+          p.value = "";
+        });
+        window.__labHelp = {
+          stop: function () {
+            stop();
+          },
+          disableFlag: function () {
+            localStorage.setItem("__LAB_DISABLE_ADV_DEBUG", "1");
+            location.reload();
+          },
+          patchEval: function () {
+            var origEval = window.eval;
+            window.eval = function (code) {
+              if (typeof code === "string") {
+                var s = code.replace(/\s+/g, "").toLowerCase();
+                if (s.indexOf("debugger") !== -1) {
+                  return;
+                }
+              }
+              return origEval.apply(this, arguments);
+            };
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>
+
