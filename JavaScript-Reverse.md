@@ -351,10 +351,3 @@ debugger 不写死，通过`de+'bugger'`字符串拼接、eval 动态执行、�
   document.documentElement.removeChild(iframe);
 })();
 ```
-
-## 执行时间检测防单步调试
-
-### 反调试原理
-
-原反制原理：单步调试时代码执行耗时变长（>10ms）、调用栈`Error().stack`长度变大，通过这个判断是否单步调试，触发则阻断执行
-

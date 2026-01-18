@@ -22,6 +22,9 @@
         color: var(--foreground);
         font-family: Georgia, "Source Serif 4", serif;
       }
+      button, input {
+        border-radius: 0;
+      }
       .texture {
         position: fixed;
         inset: 0;
@@ -52,6 +55,7 @@
         background: var(--background);
         border: 1px solid var(--border);
         padding: 32px;
+        border-radius: 0;
       }
       .label {
         font-size: 14px;
@@ -92,11 +96,22 @@
         letter-spacing: 0.1em;
         font-weight: 600;
         cursor: pointer;
+        border-radius: 0;
+        transition: background-color 0.1s linear, color 0.1s linear, border-color 0.1s linear;
       }
       .btn-outline {
         background: transparent;
         color: var(--foreground);
         border: 2px solid var(--foreground);
+      }
+      .btn:hover {
+        background: var(--background);
+        color: var(--foreground);
+        border: 2px solid var(--foreground);
+      }
+      .btn-outline:hover {
+        background: var(--foreground);
+        color: var(--background);
       }
       .hint {
         margin-top: 24px;
